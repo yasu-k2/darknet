@@ -2,7 +2,7 @@
 *.dSYM
 *.csv
 *.out
-# *.png
+*.png
 *.jpg
 *.pyc
 *.exe
@@ -10,7 +10,7 @@
 *.so
 old/
 mnist/
-# data/
+data/
 caffe/
 grasp/
 images/
