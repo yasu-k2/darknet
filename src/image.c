@@ -58,6 +58,22 @@ void composite_image(image source, image dest, int dx, int dy)
     }
 }
 
+void composite_image_text(image source, image dest, int dx, int dy)
+{
+    int x,y,k;
+    for(k = 0; k < source.c; ++k){
+        for(y = 0; y < source.h; ++y){
+            for(x = 0; x < source.w; ++x){
+                float val = get_pixel(source, x, y, k);
+                float val2 = get_pixel_extend(dest, dx+x, dy+y, k);
+                if (val2 > 0) {
+                    set_pixel(dest, dx+x, dy+y, k, val * val2);
+                }
+            }
+        }
+    }
+}
+
 image border_image(image a, int border)
 {
     image b = make_image(a.w + 2*border, a.h + 2*border, a.c);
@@ -79,8 +95,20 @@ image tile_images(image a, image b, int dx)
     if(a.w == 0) return copy_image(b);
     image c = make_image(a.w + b.w + dx, (a.h > b.h) ? a.h : b.h, (a.c > b.c) ? a.c : b.c);
     fill_cpu(c.w*c.h*c.c, 1, c.data, 1);
-    embed_image(a, c, 0, 0); 
+    embed_image(a, c, 0, 0);
     composite_image(b, c, a.w + dx, 0);
+    return c;
+}
+
+image tile_images_text(image a, image b, int b_s_w, int b_s_h, int dx_s)
+{
+    image b_s = resize_image(b, b_s_w, b_s_h);
+    if(a.w == 0) return copy_image(b_s);
+    image c = make_image(a.w + b_s.w + dx_s, (a.h > b_s.h) ? a.h : b_s.h, (a.c > b_s.c) ? a.c : b_s.c);
+    fill_cpu(c.w*c.h*c.c, 1, c.data, 1);
+    embed_image_text(a, c, 0, 0);
+    composite_image_text(b_s, c, a.w + dx_s, 0);
+    free_image(b_s);
     return c;
 }
 
@@ -100,6 +128,73 @@ image get_label(image **characters, char *string, int size)
     return b;
 }
 
+image get_label_text(image **characters, char *string, int width, int height)
+{
+    int i;
+    int char_size = 7;
+    int dx = -char_size - 1 + (char_size+1)/2;
+    float border_ratio = .05;
+    int label_width = width*(1-border_ratio*2);
+    int label_height = height*(1-border_ratio*2);
+    int label_length = strlen(string);
+    int char_width = 0;
+    int char_height = 0;
+    int char_width_wo_dx = 0;
+    float label_scaling_w;
+    float label_scaling_h;
+    int dx_scaled;
+    image *ls = calloc(label_length, sizeof(image));
+    image label = make_empty_image(0,0,0);
+
+    for(i = 0; i < label_length; i++){
+        ls[i] = characters[char_size][(int)*string];
+        if (ls[i].h > char_height) {
+            char_height = ls[i].h;
+        }
+        char_width += ls[i].w;
+        ++string;
+    }
+    char_width -= dx * (label_length - 1);
+
+    label_scaling_w = (float)label_width / char_width;
+    label_scaling_h = (float)label_height / char_height;
+
+
+    for(i = 0; i < label_length; i++){
+        char_width_wo_dx += ls[i].w * label_scaling_w;
+    }
+    dx_scaled = (label_width - char_width_wo_dx) / (label_length - 1);
+    //dx_scaled = dx * label_scaling_w;
+
+    for(i = 0; i < label_length; i++){
+        image n = tile_images_text(label, ls[i], ls[i].w * label_scaling_w, ls[i].h * label_scaling_h, dx_scaled);
+        free_image(label);
+        //free_image(ls[i]);
+        label = n;
+    }
+
+    image b = border_image(label, label.h*border_ratio);
+    free_image(label);
+
+    // Scaling here
+    return b;
+    //return label;
+    /*
+    if(size > 7) size = 7;
+    image label = make_empty_image(0,0,0);
+    while(*string){
+        image l = characters[size][(int)*string];
+        image n = tile_images(label, l, -size - 1 + (size+1)/2);
+        free_image(label);
+        label = n;
+        ++string;
+    }
+    image b = border_image(label, label.h*.25);
+    free_image(label);
+    return b;
+    */
+}
+
 void draw_label(image a, int r, int c, image label, const float *rgb)
 {
     int w = label.w;
@@ -112,6 +207,27 @@ void draw_label(image a, int r, int c, image label, const float *rgb)
             for(k = 0; k < label.c; ++k){
                 float val = get_pixel(label, i, j, k);
                 set_pixel(a, i+c, j+r, k, rgb[k] * val);
+            }
+        }
+    }
+}
+
+
+void draw_label_text(image a, int r, int c, image label, const float *rgb)
+{
+    int w = label.w;
+    int h = label.h;
+    if (r - h >= 0) r = r - h;
+
+    int i, j, k;
+    for(j = 0; j < h && j + r < a.h; ++j){
+        for(i = 0; i < w && i + c < a.w; ++i){
+            for(k = 0; k < label.c; ++k){
+                float val = get_pixel(label, i, j, k);
+                if (val < 1) {
+                    //set_pixel(a, i+c, j+r, k, 0);
+                    set_pixel(a, i+c, j+r, k, rgb[k] * val);
+                }
             }
         }
     }
@@ -190,6 +306,23 @@ image **load_alphabet()
     return alphabets;
 }
 
+image **load_alphabet_text()
+{
+    int i, j;
+    const int nsize = 8;
+    image **alphabets = calloc(nsize, sizeof(image));
+    for(j = 0; j < nsize; ++j){
+        alphabets[j] = calloc(128, sizeof(image));
+        for(i = 32; i < 127; ++i){
+            char buff[256];
+            sprintf(buff, "data/labels_text/%d_%d_t.png", i, j);
+            alphabets[j][i] = load_image_color(buff, 0, 0);
+        }
+    }
+
+    return alphabets;
+}
+
 void draw_detections(image im, int num, float thresh, box *boxes, float **probs, float **masks, char **names, image **alphabet, int classes)
 {
     int i;
@@ -234,6 +367,85 @@ void draw_detections(image im, int num, float thresh, box *boxes, float **probs,
             if (alphabet) {
                 image label = get_label(alphabet, names[class], (im.h*.03)/10);
                 draw_label(im, top + width, left, label, rgb);
+                free_image(label);
+            }
+            if (masks){
+                image mask = float_to_image(14, 14, 1, masks[i]);
+                image resized_mask = resize_image(mask, b.w*im.w, b.h*im.h);
+                image tmask = threshold_image(resized_mask, .5);
+                embed_image(tmask, im, left, top);
+                free_image(mask);
+                free_image(resized_mask);
+                free_image(tmask);
+            }
+        }
+    }
+}
+
+
+void draw_detections_text(image im, int num, float thresh, box *boxes, float **probs, float **masks, char **names, image **alphabet, int classes)
+{
+    int i;
+
+    for(i = 0; i < num; ++i){
+        int class = max_index(probs[i], classes);
+        float prob = probs[i][class];
+        if(prob > thresh){
+            int width = im.h * .005;
+
+            //if(0){
+            //    width = pow(prob, 1./2.)*10+1;
+            //    alphabet = 0;
+            //}
+
+            //printf("%d %s: %.0f%%\n", i, names[class], prob*100);
+            printf("%s: %.0f%%\n", names[class], prob*100);
+            int offset = class*123457 % classes;
+            //float red = get_color(2,offset,classes);
+            //float green = get_color(1,offset,classes);
+            //float blue = get_color(0,offset,classes);
+            float rgb_box[3];
+            float rgb_label[3];
+
+            //width = prob*20+2;
+
+            //rgb[0] = red;
+            //rgb[1] = green;
+            //rgb[2] = blue;
+            rgb_box[0] = 0.0;
+            rgb_box[1] = 0.0;
+            rgb_box[2] = 0.0;
+            rgb_label[0] = 0.0;
+            rgb_label[1] = 0.0;
+            rgb_label[2] = 0.0;
+            //rgb_label[0] = 1.0;
+            //rgb_label[1] = 1.0;
+            //rgb_label[2] = 1.0;
+            box b = boxes[i];
+
+            int left  = (b.x-b.w/2.)*im.w;
+            int right = (b.x+b.w/2.)*im.w;
+            int top   = (b.y-b.h/2.)*im.h;
+            int bot   = (b.y+b.h/2.)*im.h;
+
+            int label_width = b.w * im.w;
+            int label_height = b.h * im.h;
+
+            if(left < 0) left = 0;
+            if(right > im.w-1) right = im.w-1;
+            if(top < 0) top = 0;
+            if(bot > im.h-1) bot = im.h-1;
+
+            //draw_box_width(im, left, top, right, bot, width, rgb_box[0], rgb_box[1], rgb_box[2]);
+            if (alphabet) {
+                //image label = get_label(alphabet, names[class], (im.h*.03)/10);
+                image label = get_label_text(alphabet, names[class], label_width, label_height);
+                //draw_label(im, top + width, left, label, rgb);
+                //cvNamedWindow("label", CV_WINDOW_NORMAL);
+                //show_image(label, "label");
+                //cvWaitKey(0);
+                //cvDestroyAllWindows();
+                draw_label_text(im, bot, left, label, rgb_label);
                 free_image(label);
             }
             if (masks){
@@ -349,6 +561,53 @@ void embed_image(image source, image dest, int dx, int dy)
     }
 }
 
+void embed_image_text(image source, image dest, int dx, int dy)
+{
+/*
+#ifdef OPENCV
+    IPlImage *src_img = 0, *dst_img = 0;
+    IplImage *cpy_img, *dst_img_gray, *msk_img;
+
+    src_img = cvLoadImage (src_file, CV_LOAD_IMAGE_COLOR)); // src_file
+    dst_img = cvLoadImage (dst_file, CV_LOAD_IMAGE_COLOR)); // dst_file
+
+    cpy_img = cvCloneImage(dst_img);
+    if (src_img->width != dst_img->width)
+        return -1;
+    if (src_img->height != dst_img->height)
+        return -1;
+
+    dst_img_gray = cvCreateImage(cvGetSize(dst_img),IPL_DEPTH_8U, 1);
+    cvSplit(dst_img, NULL, NULL, dst_img_gray, NULL);
+
+    msk_img = cvCloneImage(dst_img_gray);
+    cvSmooth(dst_img_gray, dst_img_gray, CV_GAUSSIAN, 5);
+    cvThreshold(dst_img_gray, msk_img, 0, 255, CV_THRESHOLD_BINARY_INV | CV_THRESH_OTSU);
+
+    cvCopy(src_img, cpy_img, msk_img);
+
+    cvReleaseImage (&src_img);
+    cvReleaseImage (&dst_img)
+    cvReleaseImage (&cpy_img);
+    cvReleaseImage (&dst_img_gray);
+    cvReleaseImage (&msk_img);
+
+#else
+*/
+    int x,y,k;
+    for(k = 0; k < source.c; ++k){
+        for(y = 0; y < source.h; ++y){
+            for(x = 0; x < source.w; ++x){
+                float val = get_pixel(source, x,y,k);
+                if (val < 1){
+                    set_pixel(dest, dx+x, dy+y, k, val);
+                }
+            }
+        }
+    }
+//#endif
+}
+
 image collapse_image_layers(image source, int border)
 {
     int h = source.h;
@@ -457,7 +716,7 @@ void show_image_cv(image p, const char *name, IplImage *disp)
     sprintf(buff, "%s", name);
 
     int step = disp->widthStep;
-    cvNamedWindow(buff, CV_WINDOW_NORMAL); 
+    cvNamedWindow(buff, CV_WINDOW_NORMAL);
     //cvMoveWindow(buff, 100*(windows%10) + 200*(windows/10), 100*(windows%10));
     ++windows;
     for(y = 0; y < p.h; ++y){
@@ -702,7 +961,7 @@ void place_image(image im, int w, int h, int dx, int dy, image canvas)
 
 image center_crop_image(image im, int w, int h)
 {
-    int m = (im.w < im.h) ? im.w : im.h;   
+    int m = (im.w < im.h) ? im.w : im.h;
     image c = crop_image(im, (im.w - m) / 2, (im.h - m)/2, m, m);
     image r = resize_image(c, w, h);
     free_image(c);
@@ -864,7 +1123,7 @@ void letterbox_image_into(image im, int w, int h, image boxed)
         new_w = (im.w * h)/im.h;
     }
     image resized = resize_image(im, new_w, new_h);
-    embed_image(resized, boxed, (w-new_w)/2, (h-new_h)/2); 
+    embed_image(resized, boxed, (w-new_w)/2, (h-new_h)/2);
     free_image(resized);
 }
 
@@ -884,7 +1143,7 @@ image letterbox_image(image im, int w, int h)
     fill_image(boxed, .5);
     //int i;
     //for(i = 0; i < boxed.w*boxed.h*boxed.c; ++i) boxed.data[i] = 0;
-    embed_image(resized, boxed, (w-new_w)/2, (h-new_h)/2); 
+    embed_image(resized, boxed, (w-new_w)/2, (h-new_h)/2);
     free_image(resized);
     return boxed;
 }
@@ -1150,7 +1409,7 @@ image blend_image(image fore, image back, float alpha)
     for(k = 0; k < fore.c; ++k){
         for(j = 0; j < fore.h; ++j){
             for(i = 0; i < fore.w; ++i){
-                float val = alpha * get_pixel(fore, i, j, k) + 
+                float val = alpha * get_pixel(fore, i, j, k) +
                     (1 - alpha)* get_pixel(back, i, j, k);
                 set_pixel(blend, i, j, k, val);
             }
@@ -1263,8 +1522,8 @@ float bilinear_interpolate(image im, float x, float y, int c)
     float dx = x - ix;
     float dy = y - iy;
 
-    float val = (1-dy) * (1-dx) * get_pixel_extend(im, ix, iy, c) + 
-        dy     * (1-dx) * get_pixel_extend(im, ix, iy+1, c) + 
+    float val = (1-dy) * (1-dx) * get_pixel_extend(im, ix, iy, c) +
+        dy     * (1-dx) * get_pixel_extend(im, ix, iy+1, c) +
         (1-dy) *   dx   * get_pixel_extend(im, ix+1, iy, c) +
         dy     *   dx   * get_pixel_extend(im, ix+1, iy+1, c);
     return val;
@@ -1272,7 +1531,7 @@ float bilinear_interpolate(image im, float x, float y, int c)
 
 image resize_image(image im, int w, int h)
 {
-    image resized = make_image(w, h, im.c);   
+    image resized = make_image(w, h, im.c);
     image part = make_image(w, im.h, im.c);
     int r, c, k;
     float w_scale = (float)(im.w - 1) / (w - 1);
@@ -1499,7 +1758,7 @@ image collapse_images_vert(image *ims, int n)
         free_image(copy);
     }
     return filters;
-} 
+}
 
 image collapse_images_horz(image *ims, int n)
 {
@@ -1535,7 +1794,7 @@ image collapse_images_horz(image *ims, int n)
         free_image(copy);
     }
     return filters;
-} 
+}
 
 void show_image_normalized(image im, const char *name)
 {

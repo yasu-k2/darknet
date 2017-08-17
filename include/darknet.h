@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <pthread.h>
+#include <time.h>
+#include <sys/time_sub.h>
 
 #define SECRET_NUM -1234
 extern int gpu_index;
@@ -241,7 +243,7 @@ struct layer{
 
     float * m;
     float * v;
-    
+
     float * bias_m;
     float * bias_v;
     float * scale_m;
@@ -266,7 +268,7 @@ struct layer{
     float *g_cpu;
     float *o_cpu;
     float *c_cpu;
-    float *dc_cpu; 
+    float *dc_cpu;
 
     float * binary_input;
 
@@ -293,7 +295,7 @@ struct layer{
 
     struct layer *input_h_layer;
     struct layer *state_h_layer;
-	
+
     struct layer *wz;
     struct layer *uz;
     struct layer *wr;
@@ -333,7 +335,7 @@ struct layer{
     float *g_gpu;
     float *o_gpu;
     float *c_gpu;
-    float *dc_gpu; 
+    float *dc_gpu;
 
     float *m_gpu;
     float *v_gpu;
@@ -632,6 +634,7 @@ void rgbgr_weights(layer l);
 image *get_weights(layer l);
 
 void demo(char *cfgfile, char *weightfile, float thresh, int cam_index, const char *filename, char **names, int classes, int frame_skip, char *prefix, int avg, float hier_thresh, int w, int h, int fps, int fullscreen);
+void demo_text(char *cfgfile, char *weightfile, float thresh, int cam_index, const char *filename, char **names, int classes, int frame_skip, char *prefix, int avg, float hier_thresh, int w, int h, int fps, int fullscreen);
 void get_detection_boxes(layer l, int w, int h, float thresh, float **probs, box *boxes, int only_objectness);
 
 char *option_find_str(list *l, char *key, char *def);
@@ -647,7 +650,6 @@ void zero_objectness(layer l);
 void get_region_boxes(layer l, int w, int h, int netw, int neth, float thresh, float **probs, box *boxes, float **masks, int only_objectness, int *map, float tree_thresh, int relative);
 void free_network(network net);
 void set_batch_network(network *net, int b);
-void set_temp_network(network net, float t);
 image load_image(char *filename, int w, int h, int c);
 image load_image_color(char *filename, int w, int h);
 image make_image(int w, int h, int c);
@@ -689,6 +691,7 @@ data load_all_cifar10();
 box_label *read_boxes(char *filename, int *n);
 box float_to_box(float *f, int stride);
 void draw_detections(image im, int num, float thresh, box *boxes, float **probs, float **masks, char **names, image **alphabet, int classes);
+void draw_detections_text(image im, int num, float thresh, box *boxes, float **probs, float **masks, char **names, image **alphabet, int classes);
 
 matrix network_predict_data(network net, data test);
 image **load_alphabet();
@@ -699,12 +702,6 @@ float *network_predict_p(network *net, float *input);
 int network_width(network *net);
 int network_height(network *net);
 float *network_predict_image(network *net, image im);
-void network_detect(network *net, image im, float thresh, float hier_thresh, float nms, box *boxes, float **probs);
-int num_boxes(network *net);
-box *make_boxes(network *net);
-
-void reset_network_state(network net, int b);
-void reset_network_state(network net, int b);
 
 char **get_labels(char *filename);
 void do_nms_sort(box *boxes, float **probs, int total, int classes, float thresh);

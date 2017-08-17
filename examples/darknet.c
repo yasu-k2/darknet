@@ -6,6 +6,7 @@
 
 extern void predict_classifier(char *datacfg, char *cfgfile, char *weightfile, char *filename, int top);
 extern void test_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen);
+extern void text_detector(char *datacfg, char *cfgfile, char *weightfile, char *filename, float thresh, float hier_thresh, char *outfile, int fullscreen);
 extern void run_voxel(int argc, char **argv);
 extern void run_yolo(int argc, char **argv);
 extern void run_detector(int argc, char **argv);
@@ -35,13 +36,13 @@ void average(int argc, char *argv[])
     network net = parse_network_cfg(cfgfile);
     network sum = parse_network_cfg(cfgfile);
 
-    char *weightfile = argv[4];   
+    char *weightfile = argv[4];
     load_weights(&sum, weightfile);
 
     int i, j;
     int n = argc - 5;
     for(i = 0; i < n; ++i){
-        weightfile = argv[i+5];   
+        weightfile = argv[i+5];
         load_weights(&net, weightfile);
         for(j = 0; j < net.n; ++j){
             layer l = net.layers[j];
@@ -146,7 +147,7 @@ void oneoff(char *cfgfile, char *weightfile, char *outfile)
     int c = net.layers[net.n - 2].c;
     scal_cpu(oldn*c, .1, net.layers[net.n - 2].weights, 1);
     scal_cpu(oldn, 0, net.layers[net.n - 2].biases, 1);
-    net.layers[net.n - 2].n = 11921;
+    net.layers[net.n - 2].n = 9418;
     net.layers[net.n - 2].biases += 5;
     net.layers[net.n - 2].weights += 5*c;
     if(weightfile){

@@ -1,5 +1,5 @@
 #include "darknet.h"
-#include <sys/time.h>
+#include <sys/time_sub.h>
 #include <assert.h>
 
 void train_regressor(char *datacfg, char *cfgfile, char *weightfile, int *gpus, int ngpus, int clear)
@@ -172,7 +172,7 @@ void demo_regressor(char *datacfg, char *cfgfile, char *weightfile, int cam_inde
     }
 
     if(!cap) error("Couldn't connect to webcam.\n");
-    cvNamedWindow("Regressor", CV_WINDOW_NORMAL); 
+    cvNamedWindow("Regressor", CV_WINDOW_NORMAL);
     cvResizeWindow("Regressor", 512, 512);
     float fps = 0;
 

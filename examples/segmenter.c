@@ -1,5 +1,5 @@
 #include "darknet.h"
-#include <sys/time.h>
+#include <sys/time_sub.h>
 #include <assert.h>
 
 void train_segmenter(char *datacfg, char *cfgfile, char *weightfile, int *gpus, int ngpus, int clear, int display)
@@ -200,7 +200,7 @@ void demo_segmenter(char *datacfg, char *cfgfile, char *weightfile, int cam_inde
     }
 
     if(!cap) error("Couldn't connect to webcam.\n");
-    cvNamedWindow("Segmenter", CV_WINDOW_NORMAL); 
+    cvNamedWindow("Segmenter", CV_WINDOW_NORMAL);
     cvResizeWindow("Segmenter", 512, 512);
     float fps = 0;
 
@@ -220,7 +220,7 @@ void demo_segmenter(char *datacfg, char *cfgfile, char *weightfile, int cam_inde
         image pred = get_network_image(net);
         image prmask = mask_to_rgb(pred);
         show_image(prmask, "Segmenter");
-        
+
         free_image(in_s);
         free_image(in);
         free_image(prmask);
